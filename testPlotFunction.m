@@ -57,6 +57,6 @@ function [out, outStr] = testPlotFunction(name, varargin)
   end
 
   if (isvalid(refHandleReal))
-    close(refHandle);
+    close(refHandleReal);
   end
 end
