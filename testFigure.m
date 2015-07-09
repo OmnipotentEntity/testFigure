@@ -6,43 +6,31 @@
 %  Inputs:
 %    1. (Figure) The figure to test
 %    2. (Figure) The reference figure
-%    3. (char) The mode of comparison, 'default' and 'polygon'.  Default naively
-%       compares points.  Polygon assumes that each Line object represents a
-%       polygon, a closed loop, and attempts to determine if all of the points
-%       are the same and are visited in the same order (or reverse order).  For
-%       instance, [1, 2, 3, 4, 1] and [2, 3, 4, 1, 2] and [1, 4, 3, 2, 1] all
-%       represent the same shape, but [1, 3, 2, 4, 1] does not.
+%    3. (int32) Stop after finding this many errors, default is 5.  -1 is
+%       infinite
 %    4. (uint32) An integer representing the number of epsilon to accept,
 %       default is 1000.
-%    5. (int32) Stop after finding this many errors, default is 5.  -1 is
-%       infinite
 %
 %  Outputs:
 %    1. (bool) true if the two figures match
 %    2. (char) A detailed description of what matches and what does not.
 
-function [out, outStr] = testFigure(testFig, refFig, compareMode, epsilons, keepGoing)
+function [out, outStr] = testFigure(testFig, refFig, keepGoing, epsilons)
 
   if ~isequal(class(testFig), 'matlab.ui.Figure') ||...
      ~isequal(class(refFig),  'matlab.ui.Figure')
     error 'Unexpected class type passed in as arguments.';
   end
 
-  % set up input arguments
   if nargin < 3
-    compareMode = 'default';
+    keepGoing = 5;
   end
-
-  testPoly = isequal(compareMode, 'polygon');
 
   if nargin < 4
     epsilons = 1000;
   end
 
-  if nargin < 5
-    keepGoing = 5;
-  end
-
+  % if user enters a 0, we want to fail after one
   if ~keepGoing
     keepGoing = 1;
   end
@@ -83,7 +71,7 @@ function [out, outStr] = testFigure(testFig, refFig, compareMode, epsilons, keep
   axesToTest = min(length(testAxes), length(refAxes));
 
   for ii = 1:length(axesToTest)
-    [axesOut, axesStr, keepGoing] = testAxis(testAxes(ii), refAxes(ii), testPoly,...
+    [axesOut, axesStr, keepGoing] = testAxis(testAxes(ii), refAxes(ii),...
       epsilons, keepGoing);
     out = out && axesOut;
     if ~axesOut
@@ -100,7 +88,7 @@ function [out, outStr] = testFigure(testFig, refFig, compareMode, epsilons, keep
 end
 
 % testAxis tests each graph in a similar manner to testFigure
-function [out, outStr, keepGoing] = testAxis(testAxes, refAxes, testPoly, epsilons, keepGoing)
+function [out, outStr, keepGoing] = testAxis(testAxes, refAxes, epsilons, keepGoing)
 
   out = true;
   outStr = '';
@@ -111,12 +99,15 @@ function [out, outStr, keepGoing] = testAxis(testAxes, refAxes, testPoly, epsilo
 
   testYLim = get(testAxes, 'YLim');
   refYLim = get(refAxes, 'YLim');
+  
+  testZLim = get(testAxes, 'ZLim');
+  refZLim = get(refAxes, 'ZLim');
 
   [xOut, xOutStr] = testLimits(testXLim, refXLim, 'XLim', epsilons);
   out = out && xOut;
   outStr = [outStr xOutStr];
 
-  if ~out
+  if ~xOut
     keepGoing = keepGoing - 1;
     if ~keepGoing
       return;
@@ -128,11 +119,77 @@ function [out, outStr, keepGoing] = testAxis(testAxes, refAxes, testPoly, epsilo
   out = out && yOut;
   outStr = [outStr yOutStr];
   
-  if ~out
+  if ~yOut
     keepGoing = keepGoing - 1;
     if ~keepGoing
       return;
     end
+  end
+
+  if length(refZLim)
+    [zOut, zOutStr] = testLimits(testZLim, refZLim, 'ZLim', epsilons);
+    
+    out = out && zOut;
+    outStr = [outStr zOutStr];
+
+    if ~zOut
+      keepGoing = keepGoing - 1;
+      if ~keepGoing
+        return;
+      end
+    end
+  end
+
+  % now we test the view
+
+  testView = get(testAxes, 'View');
+  refView = get(refAxes, 'View');
+
+  if ~isequal(testView, refView)
+    out = false;
+
+    testViewText = sprintf('[%f, %f]', testView(1), testView(2));
+    refViewText = sprintf('[%f, %f]', refView(1), refView(2));
+
+    % view(2) special case
+    if (isequal(testView, [0 90]))
+      testViewText = 'view(2)';
+    end
+
+    if (isequal(refView, [0 90]))
+      refViewText = 'view(2)';
+    end
+
+    % view(3) special case
+    if (isequal(testView, [-37.5 30]))
+      testViewText = 'view(3)';
+    end
+
+    if (isequal(refView, [-37.5 30]))
+      refViewText = 'view(3)';
+    end
+    
+    outStr = [outStr sprintf('View mismatch.  Got %s, expected %s.\n',...
+      testViewText, refViewText)];
+      
+    keepGoing = keepGoing - 1;
+    if ~keepGoing
+      return;
+    end
+  end
+
+  % now we test the aspect ratio, for axis square, axis equal etc.
+
+  testDataAsp = get(testAxes, 'DataAspectRatio');
+  refDataAsp = get(refAxes, 'DataAspectRatio');
+
+  testPlotAsp = get(testAxes, 'PlotBoxAspectRatio');
+  refPlotAsp = get(refAxes, 'PlotBoxAspectRatio');
+
+  if ~isequal(testDataAsp, refDataAsp) || ~isequal(testPlotAsp, refPlotAsp)
+    out = false;
+    outStr = [outStr sprintf(['Aspect ratio mismatch.  Did you forget to '...
+      'set axis square or axis equal or something similar?\n'])];
   end
 
   % next, get every line and test for sanity
@@ -161,7 +218,7 @@ function [out, outStr, keepGoing] = testAxis(testAxes, refAxes, testPoly, epsilo
   linesToTest = min(length(testLines), length(refLines));
 
   for ii = 1:linesToTest
-    [lineOut, lineStr, keepGoing] = testLine(testLines(ii), refLines(ii), testPoly,...
+    [lineOut, lineStr, keepGoing] = testLine(testLines(ii), refLines(ii),...
       epsilons, keepGoing);
     out = out && lineOut;
     
@@ -185,13 +242,6 @@ function [out, outStr] = testLimits(testLim, refLim, limName, epsilons)
   out = out && lowOut;
   outStr = [outStr lowOutStr];
 
-  if ~out
-    keepGoing = keepGoing - 1;
-    if ~keepGoing
-      return;
-    end
-  end
-
   [highOut, highOutStr] = testLimit(testLim(2), refLim(2),...
     ['High' limName], epsilons);
 
@@ -213,13 +263,13 @@ function [out, outStr] = testLimit(testLim, refLim, limName, epsilons)
         ' %d epsilons.\n'], limName, xEps)];
     else
       outStr = [outStr sprintf('%s is incorrect. Expected %0.6f got %0.6f.\n',...
-        limName, testXLim, refXLim)];
+        limName, testLim, refLim)];
     end
   end
 end
 
 % test one line
-function [out, outStr, keepGoing] = testLine(testLine, refLine, testPoly, epsilons, keepGoing)
+function [out, outStr, keepGoing] = testLine(testLine, refLine, epsilons, keepGoing)
 
   out = true;
   outStr = '';
@@ -280,33 +330,28 @@ function [out, outStr, keepGoing] = testLine(testLine, refLine, testPoly, epsilo
   end
 
   zEnabled = length(testZ) ~= 0;
-
-  if testPoly
-    % make sure we have data, so we don't dereference an empty list and crash
-    if isempty(testX)
-      if ~isempty(refX)
-        out = false;
-        outStr = [outStr sprintf(['Empty data in line where data was '...
-          'expected.\n'])];
-        keepGoing = keepGoing - 1;
-        if ~keepGoing
-          return;
-        end
-      end
-    % dataY will always be the same length as dataX, so we only need to test X
-    elseif length(testX) ~= length(refX)
+  if isempty(testX)
+    if ~isempty(refX)
       out = false;
-      outStr = [outStr sprintf(['Data length mismatch.  Got length %d'...
-        ' expected %d.\n'], length(testX), length(refX))];
+      outStr = [outStr sprintf(['Empty data in line where data was '...
+        'expected.\n'])];
       keepGoing = keepGoing - 1;
       if ~keepGoing
         return;
       end
-    else
-      if refPoints(:,1) ~= refPoints(:,end)
-        error 'Reference line does not close, but poly mode selected.';
-      end
-
+    end
+  % dataY will always be the same length as dataX, so we only need to test X
+  elseif length(testX) ~= length(refX)
+    out = false;
+    outStr = [outStr sprintf(['Data length mismatch.  Got length %d'...
+      ' expected %d.\n'], length(testX), length(refX))];
+    keepGoing = keepGoing - 1;
+    if ~keepGoing
+      return;
+    end
+  else
+    % test polygon in this case
+    if refPoints(:,1) == refPoints(:,end)
       if testPoints(:,1) ~= testPoints(:,end)
         out = false;
         outStr = [outStr 'Poly not closed.  Last point does not match first '...
@@ -367,6 +412,7 @@ function [out, outStr, keepGoing] = testLine(testLine, refLine, testPoly, epsilo
           bestEps = 0;
           bestStr = '';
           matchFound = false;
+
           % for each match
           for offset = offsets
 
@@ -454,62 +500,61 @@ function [out, outStr, keepGoing] = testLine(testLine, refLine, testPoly, epsilo
 
           out = out && matchFound;
           if ~matchFound
-            outStr = [outStr bestStr];
+            outStr = [outStr bestStr]
             keepGoing = keepGoing - 1;
             if ~keepGoing
               return;
             end
           end
 
-        end % if length(offsets) == 0
+        end % if isempty(offsets)
       end
-    end % if dataLen == 0
-  else % if testPoly
+    else % if refPoints(:,1) == refPoints(:,end)
+      % if we're not testing direction and offset agnostic then the situation is
+      % much easier
 
-    % if we're not testing direction and offset agnostic then the situation is
-    % much easier
+      for ii = 1:length(testX)
+        [xEq, xEps] = almostEqual(testPoints(:, ii), refPoints(:, ii), epsilons);
 
-    if length(testX) ~= length(refX)
-      out = false;
-      outStr = [outStr sprintf(['Wrong number of plotted points in Line. '...
-        'Found %d expected %d.'], length(testX), length(refX))];
+        if ~all(xEq)
+          out = false;
 
-      keepGoing = keepGoing - 1;
-      if ~keepGoing
-        return;
-      end
-    end
+          maxEps = max(xEps(1:end));
 
-    lengthToTest = min(length(testX), length(refX));
+          if maxEps < 100 * epsilons
+            zCoord = '';
+            if zEnabled
+              zCoord = sprintf(', %0.17f', refZ(ii));
+            end
 
-    for ii = 1:lengthToTest
-      [xEq, xEps] = almostEqual(testX(ii), refX(ii), epsilons);
-      [yEq, yEps] = almostEqual(testY(ii), refY(ii), epsilons);
+            outStr = [outStr,...
+              sprintf(['Data mismatch, index %d is near expected '...
+                'value of [%0.17f, %0.17f%s], with a max difference of '...
+                '%d epsilons.\n'],...
+                ii, refX(ii), refY(ii), zCoord, max(xEps(ii), yEps(ii)))];
+          else
+            zCoordTest = '';
+            zCoordRef = '';
+            if zEnabled
+              zCoordTest = sprintf(', %0.6', testZ(ii));
+              zCoordRef = sprintf(', %0.6', refZ(ii));
+            end
 
-      if ~xEq || ~yEq
-        out = false;
+            outStr = [outStr,...
+            sprintf(['Data mismatch, index %d is incorrect. '...
+              'Expected [%0.6f, %0.6f%s] got [%0.6f, %0.6f%s].\n'],...
+              ii, refX(ii), refY(ii), zCoordRef,...
+              testX(ii), testY(ii), zCoordTest)];
+          end
 
-        if xEps < 100 * epsilons && yEps < 100 * epsilons
-          outStr = [outStr,...
-            sprintf(['Data mismatch, index %d is near expected '...
-              'value of [%0.17f, %0.17f], with a max difference of '...
-              '%d epsilons.\n'],...
-              ii, refX(ii), refY(ii), max(xEps(ii), yEps(ii)))];
-        else
-          outStr = [outStr,...
-          sprintf(['Data mismatch, index %d is incorrect. '...
-            'Expected [%0.6f, %0.6f] got [%0.6f, %0.6f].\n'],...
-            ii, refX(ii), refY(ii), testX(ii), testY(ii))];
+          keepGoing = keepGoing - 1;
+          if ~keepGoing
+            return;
+          end
         end
-
-        keepGoing = keepGoing - 1;
-        if ~keepGoing
-          return;
-        end
       end
-    end
-
-  end % if testPoly
+    end % if refPoints(:,1) == refPoints(:,end)
+  end % if isempty(testX)
 end
 
 % almostEqual tests floats for near equality.
