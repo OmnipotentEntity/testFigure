@@ -10,12 +10,13 @@
 %       infinite
 %    4. (uint32) An integer representing the number of epsilon to accept,
 %       default is 1000.
+%    5. (double) A double representing the largest difference to reject
 %
 %  Outputs:
 %    1. (bool) true if the two figures match
 %    2. (char) A detailed description of what matches and what does not.
 
-function [out, outStr] = testFigure(testFig, refFig, keepGoing, epsilons)
+function [out, outStr] = testFigure(testFig, refFig, keepGoing, epsilons, absoluteDiff)
 
   if ~isequal(class(testFig), 'matlab.ui.Figure') ||...
      ~isequal(class(refFig),  'matlab.ui.Figure')
@@ -28,6 +29,13 @@ function [out, outStr] = testFigure(testFig, refFig, keepGoing, epsilons)
 
   if nargin < 4
     epsilons = 1000;
+  end
+
+  % this is required because sometimes when we get near 0 we're still a little
+  % off, but the eps on these values is so low that our eps difference is
+  % ridiculous (10^12 territory)
+  if nargin < 5
+    absoluteDiff = 10^-15;
   end
 
   % if user enters a 0, we want to fail after one
@@ -72,7 +80,7 @@ function [out, outStr] = testFigure(testFig, refFig, keepGoing, epsilons)
 
   for ii = 1:length(axesToTest)
     [axesOut, axesStr, keepGoing] = testAxis(testAxes(ii), refAxes(ii),...
-      epsilons, keepGoing);
+      epsilons, absoluteDiff, keepGoing);
     out = out && axesOut;
     if ~axesOut
       outStr = [outStr sprintf('Subplot %d:\n', ii) axesStr];
@@ -88,7 +96,7 @@ function [out, outStr] = testFigure(testFig, refFig, keepGoing, epsilons)
 end
 
 % testAxis tests each graph in a similar manner to testFigure
-function [out, outStr, keepGoing] = testAxis(testAxes, refAxes, epsilons, keepGoing)
+function [out, outStr, keepGoing] = testAxis(testAxes, refAxes, epsilons, absoluteDiff, keepGoing)
 
   out = true;
   outStr = '';
@@ -103,7 +111,7 @@ function [out, outStr, keepGoing] = testAxis(testAxes, refAxes, epsilons, keepGo
   testZLim = get(testAxes, 'ZLim');
   refZLim = get(refAxes, 'ZLim');
 
-  [xOut, xOutStr] = testLimits(testXLim, refXLim, 'XLim', epsilons);
+  [xOut, xOutStr] = testLimits(testXLim, refXLim, 'XLim', epsilons, absoluteDiff);
   out = out && xOut;
   outStr = [outStr xOutStr];
 
@@ -114,7 +122,7 @@ function [out, outStr, keepGoing] = testAxis(testAxes, refAxes, epsilons, keepGo
     end
   end
 
-  [yOut, yOutStr] = testLimits(testYLim, refYLim, 'YLim', epsilons);
+  [yOut, yOutStr] = testLimits(testYLim, refYLim, 'YLim', epsilons, absoluteDiff);
 
   out = out && yOut;
   outStr = [outStr yOutStr];
@@ -127,7 +135,7 @@ function [out, outStr, keepGoing] = testAxis(testAxes, refAxes, epsilons, keepGo
   end
 
   if length(refZLim)
-    [zOut, zOutStr] = testLimits(testZLim, refZLim, 'ZLim', epsilons);
+    [zOut, zOutStr] = testLimits(testZLim, refZLim, 'ZLim', epsilons, absoluteDiff);
     
     out = out && zOut;
     outStr = [outStr zOutStr];
@@ -219,7 +227,7 @@ function [out, outStr, keepGoing] = testAxis(testAxes, refAxes, epsilons, keepGo
 
   for ii = 1:linesToTest
     [lineOut, lineStr, keepGoing] = testLine(testLines(ii), refLines(ii),...
-      epsilons, keepGoing);
+      epsilons, absoluteDiff, keepGoing);
     out = out && lineOut;
     
     if ~lineOut
@@ -233,17 +241,17 @@ function [out, outStr, keepGoing] = testAxis(testAxes, refAxes, epsilons, keepGo
 end
 
 % test limit tests an axes limit pair
-function [out, outStr] = testLimits(testLim, refLim, limName, epsilons)
+function [out, outStr] = testLimits(testLim, refLim, limName, epsilons, absoluteDiff)
   out = true;
   outStr = '';
 
   [lowOut, lowOutStr] = testLimit(testLim(1), refLim(1),...
-    ['Low' limName], epsilons);
+    ['Low' limName], epsilons, absoluteDiff);
   out = out && lowOut;
   outStr = [outStr lowOutStr];
 
   [highOut, highOutStr] = testLimit(testLim(2), refLim(2),...
-    ['High' limName], epsilons);
+    ['High' limName], epsilons, absoluteDiff);
 
   out = out && highOut;
   outStr = [outStr highOutStr];
@@ -251,11 +259,11 @@ function [out, outStr] = testLimits(testLim, refLim, limName, epsilons)
 end
 
 % test one limit
-function [out, outStr] = testLimit(testLim, refLim, limName, epsilons)
+function [out, outStr] = testLimit(testLim, refLim, limName, epsilons, absoluteDiff)
   out = true;
   outStr = '';
 
-  [xEq, xEps] = almostEqual(testLim, refLim, epsilons);
+  [xEq, xEps] = almostEqual(testLim, refLim, epsilons, absoluteDiff);
   if ~xEq
     out = false;
     if xEps < 100 * epsilons
@@ -269,7 +277,7 @@ function [out, outStr] = testLimit(testLim, refLim, limName, epsilons)
 end
 
 % test one line
-function [out, outStr, keepGoing] = testLine(testLine, refLine, epsilons, keepGoing)
+function [out, outStr, keepGoing] = testLine(testLine, refLine, epsilons, absoluteDiff, keepGoing)
 
   out = true;
   outStr = '';
@@ -382,13 +390,15 @@ function [out, outStr, keepGoing] = testLine(testLine, refLine, epsilons, keepGo
         testOffset = 0;
 
         for ii = 1:dataLen
-          offsetsX = find(almostEqual(testX(ii), refX, epsilons));
-          offsetsY = find(almostEqual(testY(ii), refY, epsilons));
+          [~, xEps] = almostEqual(testX(ii), refX, epsilons, absoluteDiff);
+          [~, yEps] = almostEqual(testY(ii), refY, epsilons, absoluteDiff);
+          offsetsX = find(almostEqual(testX(ii), refX, epsilons, absoluteDiff));
+          offsetsY = find(almostEqual(testY(ii), refY, epsilons, absoluteDiff));
 
           offsets = intersect(offsetsX, offsetsY);
 
           if zEnabled
-            offsetsZ = find(almostEqual(testZ(ii), refZ, epsilons));
+            offsetsZ = find(almostEqual(testZ(ii), refZ, epsilons, absoluteDiff));
             offsets = intersect(offsets, offsetsZ);
           end
 
@@ -450,7 +460,7 @@ function [out, outStr, keepGoing] = testLine(testLine, refLine, epsilons, keepGo
                 thisRefPoints = [thisRefPoints; thisRefZ];
               end
 
-              [xEq, xEps] = almostEqual(thisTestPoints, thisRefPoints, epsilons);
+              [xEq, xEps] = almostEqual(thisTestPoints, thisRefPoints, epsilons, absoluteDiff);
 
               matches = all(xEq, 1);
               maxEps = max(max(xEps));
@@ -514,7 +524,7 @@ function [out, outStr, keepGoing] = testLine(testLine, refLine, epsilons, keepGo
       % much easier
 
       for ii = 1:length(testX)
-        [xEq, xEps] = almostEqual(testPoints(:, ii), refPoints(:, ii), epsilons);
+        [xEq, xEps] = almostEqual(testPoints(:, ii), refPoints(:, ii), epsilons, absoluteDiff);
 
         if ~all(xEq)
           out = false;
@@ -558,7 +568,9 @@ function [out, outStr, keepGoing] = testLine(testLine, refLine, epsilons, keepGo
 end
 
 % almostEqual tests floats for near equality.
-function [out, epsDiff] = almostEqual(a, b, epsilons)
-  epsDiff = floor(abs(a - b) ./ (epsilons * eps(b)));
+function [out, epsDiff] = almostEqual(a, b, epsilons, absoluteDiff)
+  diff = abs(a - b);
+  epsDiff = floor(diff ./ (epsilons * eps(b)));
   out = epsDiff <= epsilons;
+  out = out | diff < absoluteDiff;
 end
