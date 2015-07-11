@@ -6,7 +6,7 @@
 %  Inputs:
 %    1. (Figure) The figure to test
 %    2. (Figure) The reference figure
-%    3. (int32) Stop after finding this many errors, default is 5.  -1 is
+%    3. (int32) Stop after finding this many errors, default is 5. -1 is
 %       infinite
 %    4. (uint32) An integer representing the number of epsilon to accept,
 %       default is 1000.
@@ -49,7 +49,7 @@ function [out, outStr] = testFigure(testFig, refFig, keepGoing, epsilons, absolu
 
   epsilons = floor(epsilons);
 
-  % grab the axes.  There may be several of each
+  % grab the axes. There may be several of each
   testAxes = get(testFig, 'Children');
   refAxes = get(refFig, 'Children');
 
@@ -66,7 +66,7 @@ function [out, outStr] = testFigure(testFig, refFig, keepGoing, epsilons, absolu
   % explaining the issue
   if length(testAxes) ~= length(refAxes)
     out = false;
-    outStr = [outStr sprintf(['The number of subplots are different.  The ',...
+    outStr = [outStr sprintf(['The number of subplots are different. The ',...
       'test figure has %d plots, but the reference figure has %d.\n'],...
       length(testAxes), length(refAxes))];
     keepGoing = keepGoing - 1;
@@ -78,7 +78,7 @@ function [out, outStr] = testFigure(testFig, refFig, keepGoing, epsilons, absolu
   % the number of axes to test
   axesToTest = min(length(testAxes), length(refAxes));
 
-  for ii = 1:length(axesToTest)
+  for ii = 1:axesToTest
     [axesOut, axesStr, keepGoing] = testAxis(testAxes(ii), refAxes(ii),...
       epsilons, absoluteDiff, keepGoing);
     out = out && axesOut;
@@ -101,7 +101,73 @@ function [out, outStr, keepGoing] = testAxis(testAxes, refAxes, epsilons, absolu
   out = true;
   outStr = '';
 
-  % first, test the limits of the axes
+  % let's test the names of the axes and the title
+  testTitle = get(testAxes, 'Title');
+  testTitle = get(testTitle, 'String');
+  refTitle = get(refAxes, 'Title');
+  refTitle = get(refTitle, 'String');
+
+  testXLabel = get(testAxes, 'XLabel');
+  testXLabel = get(testXLabel, 'String');
+  refXLabel = get(refAxes, 'XLabel');
+  refXLabel = get(refXLabel, 'String');
+  
+  testYLabel = get(testAxes, 'YLabel');
+  testYLabel = get(testYLabel, 'String');
+  refYLabel = get(refAxes, 'YLabel');
+  refYLabel = get(refYLabel, 'String');
+  
+  testZLabel = get(testAxes, 'ZLabel');
+  testZLabel = get(testZLabel, 'String');
+  refZLabel = get(refAxes, 'ZLabel');
+  refZLabel = get(refZLabel, 'String');
+
+  % wtb a closure, please and thank you
+  if ~isequal(testTitle, refTitle)
+    out = false;
+    outStr = [outStr sprintf(['Axes title mismatch. Got ''%s'' but expected '...
+      '''%s''.'], testTitle, testTitle)];
+
+    keepGoing = keepGoing - 1;
+    if ~keepGoing
+      return;
+    end
+  end
+
+  if ~isequal(testXLabel, refXLabel)
+    out = false;
+    outStr = [outStr sprintf(['XLabel mismatch. Got ''%s'' but expected '...
+      '''%s''.'], testXLabel, refXLabel)];
+
+    keepGoing = keepGoing - 1;
+    if ~keepGoing
+      return;
+    end
+  end
+  
+  if ~isequal(testYLabel, refYLabel)
+    out = false;
+    outStr = [outStr sprintf(['YLabel mismatch. Got ''%s'' but expected '...
+      '''%s''.'], testYLabel, refYLabel)];
+
+    keepGoing = keepGoing - 1;
+    if ~keepGoing
+      return;
+    end
+  end
+  
+  if ~isequal(testZLabel, refZLabel)
+    out = false;
+    outStr = [outStr sprintf(['ZLabel mismatch. Got ''%s'' but expected '...
+      '''%s''.'], testZLabel, refZLabel)];
+
+    keepGoing = keepGoing - 1;
+    if ~keepGoing
+      return;
+    end
+  end
+
+  % then test the limits of the axes
   testXLim = get(testAxes, 'XLim');
   refXLim = get(refAxes, 'XLim');
 
@@ -177,7 +243,7 @@ function [out, outStr, keepGoing] = testAxis(testAxes, refAxes, epsilons, absolu
       refViewText = 'view(3)';
     end
     
-    outStr = [outStr sprintf('View mismatch.  Got %s, expected %s.\n',...
+    outStr = [outStr sprintf('View mismatch. Got %s, expected %s.\n',...
       testViewText, refViewText)];
       
     keepGoing = keepGoing - 1;
@@ -196,7 +262,7 @@ function [out, outStr, keepGoing] = testAxis(testAxes, refAxes, epsilons, absolu
 
   if ~isequal(testDataAsp, refDataAsp) || ~isequal(testPlotAsp, refPlotAsp)
     out = false;
-    outStr = [outStr sprintf(['Aspect ratio mismatch.  Did you forget to '...
+    outStr = [outStr sprintf(['Aspect ratio mismatch. Did you forget to '...
       'set axis square or axis equal or something similar?\n'])];
   end
 
@@ -214,7 +280,7 @@ function [out, outStr, keepGoing] = testAxis(testAxes, refAxes, epsilons, absolu
   % explaining the issue
   if length(testLines) ~= length(refLines)
     out = false;
-    outStr = [outStr sprintf(['The number of lines are different.  The ',...
+    outStr = [outStr sprintf(['The number of lines are different. The ',...
       'test axis has %d lines, but the reference axis has %d.\n'],...
       length(testLines), length(refLines))];
     keepGoing = keepGoing - 1;
@@ -301,7 +367,7 @@ function [out, outStr, keepGoing] = testLine(testLine, refLine, epsilons, absolu
 
   if ~isequal(testType, refType)
     out = false;
-    outStr = [outStr sprintf(['Style of the lines differ.  Got ''%s'' '...
+    outStr = [outStr sprintf(['Style of the lines differ. Got ''%s'' '...
       'expected ''%s''.\n'], testType, refType)];
     keepGoing = keepGoing - 1;
     if ~keepGoing
@@ -351,7 +417,7 @@ function [out, outStr, keepGoing] = testLine(testLine, refLine, epsilons, absolu
   % dataY will always be the same length as dataX, so we only need to test X
   elseif length(testX) ~= length(refX)
     out = false;
-    outStr = [outStr sprintf(['Data length mismatch.  Got length %d'...
+    outStr = [outStr sprintf(['Data length mismatch. Got length %d'...
       ' expected %d.\n'], length(testX), length(refX))];
     keepGoing = keepGoing - 1;
     if ~keepGoing
@@ -362,7 +428,7 @@ function [out, outStr, keepGoing] = testLine(testLine, refLine, epsilons, absolu
     if refPoints(:,1) == refPoints(:,end)
       if testPoints(:,1) ~= testPoints(:,end)
         out = false;
-        outStr = [outStr 'Poly not closed.  Last point does not match first '...
+        outStr = [outStr 'Poly not closed. Last point does not match first '...
           'point.\n'];
         keepGoing = keepGoing - 1;
         if ~keepGoing
