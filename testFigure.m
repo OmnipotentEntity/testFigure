@@ -126,7 +126,7 @@ function [out, outStr, keepGoing] = testAxis(testAxes, refAxes, epsilons, absolu
   if ~isequal(testTitle, refTitle)
     out = false;
     outStr = [outStr sprintf(['Axes title mismatch. Got ''%s'' but expected '...
-      '''%s''.'], testTitle, testTitle)];
+      '''%s''.\n'], testTitle, testTitle)];
 
     keepGoing = keepGoing - 1;
     if ~keepGoing
@@ -137,7 +137,7 @@ function [out, outStr, keepGoing] = testAxis(testAxes, refAxes, epsilons, absolu
   if ~isequal(testXLabel, refXLabel)
     out = false;
     outStr = [outStr sprintf(['XLabel mismatch. Got ''%s'' but expected '...
-      '''%s''.'], testXLabel, refXLabel)];
+      '''%s''.\n'], testXLabel, refXLabel)];
 
     keepGoing = keepGoing - 1;
     if ~keepGoing
@@ -148,7 +148,7 @@ function [out, outStr, keepGoing] = testAxis(testAxes, refAxes, epsilons, absolu
   if ~isequal(testYLabel, refYLabel)
     out = false;
     outStr = [outStr sprintf(['YLabel mismatch. Got ''%s'' but expected '...
-      '''%s''.'], testYLabel, refYLabel)];
+      '''%s''.\n'], testYLabel, refYLabel)];
 
     keepGoing = keepGoing - 1;
     if ~keepGoing
@@ -159,7 +159,7 @@ function [out, outStr, keepGoing] = testAxis(testAxes, refAxes, epsilons, absolu
   if ~isequal(testZLabel, refZLabel)
     out = false;
     outStr = [outStr sprintf(['ZLabel mismatch. Got ''%s'' but expected '...
-      '''%s''.'], testZLabel, refZLabel)];
+      '''%s''.\n'], testZLabel, refZLabel)];
 
     keepGoing = keepGoing - 1;
     if ~keepGoing
